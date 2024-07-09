@@ -5,7 +5,7 @@ from bots import *
 
 
 API_TOKEN = '1156662740:AAEWzSmMZkdRiwlBX_fmLxdMeUuPQgE3ETM' # Store in env
-WEBHOOK_URL = 'https://75b3-45-244-170-117.ngrok-free.app' # Store in env
+WEBHOOK_URL = 'https://xenogeneic-jannelle-joethon-b834bbe8.koyeb.app' # Store in env
 WEBHOOK_PORT = 8443 
 
 
