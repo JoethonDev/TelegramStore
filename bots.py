@@ -257,7 +257,7 @@ class HostBot:
             host="ep-delicate-tooth-a2u3cnv5.eu-central-1.aws.neon.tech",
             port="5432"
         )
-        self.url = "https://JoethonDev.pythonanywhere.com"
+        self.url = "https://xenogeneic-jannelle-joethon-b834bbe8.koyeb.apps"
         self.cursor = self.connection.cursor()
         self.time_zone = pytz.timezone('Africa/Cairo')
         self.admin = "1019315752"
