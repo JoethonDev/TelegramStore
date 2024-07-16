@@ -5,6 +5,7 @@ from bots import *
 
 API_TOKEN = '1156662740:AAEWzSmMZkdRiwlBX_fmLxdMeUuPQgE3ETM' # Store in env
 WEBHOOK_URL = 'https://xenogeneic-jannelle-joethon-b834bbe8.koyeb.app' # Store in env
+WEBHOOK_PORT = 8000
 
 bot = HostBot(API_TOKEN)
 app = Flask(__name__)
