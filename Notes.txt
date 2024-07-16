@@ -1,7 +1,0 @@
-- Quantity in services (Done)
-- Make setting button for client bot
-    - Notify new users register [opt.]
-    - Change welcome message (Done)
-    - Register to channel before start [opt.]
-- Stop bots on expiration!
-- Start Marketing
