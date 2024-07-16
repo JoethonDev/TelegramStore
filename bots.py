@@ -3,6 +3,7 @@ from telebot import types
 import psycopg2
 import pytz
 from datetime import datetime, timedelta
+import logging
 
 
 # Start => Register User + Display Hello Message + Keyboard [add bot - my bots - account - deposit - withdraw - check bot] | admin = [Bots Stats - Deposit Stats - Withdraw Stats - Orders]
@@ -12,9 +13,18 @@ from datetime import datetime, timedelta
 # deposit => Display deposit message with Cash => Send Screenshot => Send admin request => Accept/Reject [like in client bot]
 # withdraw => Display withdraw message with balance can be withdrawn => Send Number to withdraw => Send admin request => Accept/Reject [like in client bot]
 
+def logging_service(func):
+    def wrap_func(*args, **kwrags):
+        try:
+            return func(*args, **kwrags)
+        except Exception as e:
+            logging.exception(e)
+    return wrap_func()
+
 class HostBot:
 
     # Functions
+    @logging_service
     def register_bot(self, token, username, user_id):
         try:
             self.cursor.execute('''
@@ -24,31 +34,36 @@ class HostBot:
         except Exception as e:
             self.connection.rollback()
 
+    @logging_service
     def set_webhook(self, url):
         self.bot.remove_webhook()
         self.bot.set_webhook(url=url) 
          
-
+    @logging_service
     def create_bot(self, token, url):
         bot = ClientBot(token)
         bot.set_webhook(url)
         bot.initialize_handlers()
-
+    
+    @logging_service
     def stop_bot(self, token, url):
         bot = ClientBot(token)
         bot.set_webhook(url)
         bot.initialize_handlers()
 
+    @logging_service
     def delete_bot(self, token):
         bot = ClientBot(token)
         bot.delete_webhook()
 
+    @logging_service
     def is_bot_exist(self, token):
         self.cursor.execute(f'''
                 SELECT * from bots WHERE bot_token='{token}'
             ''')
         return self.cursor.fetchone()
 
+    @logging_service
     def get_self_id(self):
         username = str(self.bot.get_me().username)
         self.cursor.execute(f"""
@@ -56,18 +71,21 @@ class HostBot:
         """)
         return self.cursor.fetchone()[0]
 
+    @logging_service
     def get_seller(self, user_id):
         self.cursor.execute(f"""
             SELECT id from sellers WHERE user_id = '{user_id}'
         """)
         return self.cursor.fetchone()[0]
-
+    
+    @logging_service
     def check_user(self, user_id):
         self.cursor.execute('''
             SELECT * FROM sellers WHERE user_id='%s'
         ''', (user_id,))
         return self.cursor.fetchone()
 
+    @logging_service
     def register_user(self, user_id):
         if not self.check_user(user_id):
             try:
@@ -77,7 +95,8 @@ class HostBot:
                 self.connection.commit()
             except Exception as e:
                 self.connection.rollback()
-    
+
+    @logging_service    
     def get_main_keyboard(self, user_id):
         markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         buttons = [
@@ -97,17 +116,20 @@ class HostBot:
 
         markup.add(*buttons)
         return markup
-    
+
+    @logging_service    
     def is_admin(self, user_id):
         # Check if the user is an admin
         return str(user_id) == self.admin # Remove hardcoded
         # self.cursor.execute('SELECT * FROM admins WHERE user_id = %s', (user_id,))
         # return self.cursor.fetchone() is not None
 
+    @logging_service
     def get_bot_username(self, token):
         test_bot = telebot.TeleBot(token)
         return test_bot.get_me().username
 
+    @logging_service
     def validate_token(self, token):
         try:
             test_bot = telebot.TeleBot(token)
@@ -116,6 +138,7 @@ class HostBot:
         except:
             return False
 
+    @logging_service
     def get_bots_keyboard(self, bots, page):
         try:
             markup = types.InlineKeyboardMarkup(row_width=2)
@@ -142,6 +165,7 @@ class HostBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def add_navigation_buttons(self, markup, bots, page=1):
         if len(bots) > 6 * page:
             next_button = types.InlineKeyboardButton(">>", callback_data=f'page:{page + 1}')
@@ -150,12 +174,14 @@ class HostBot:
             previous_button = types.InlineKeyboardButton("<<", callback_data=f'page:{page - 1}')
             markup.add(previous_button)
 
+    @logging_service
     def pagination_bots(self, bots, page):
         end = 6 * page if len(bots) > 6 * page else len(bots)
         start = end - 6
 
         return bots[start:end]
 
+    @logging_service
     def add_transfer(self, bot_id, user_id, transfer, balance, photo_id=None, caption=None):
         try:
             date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -182,6 +208,7 @@ class HostBot:
         finally :
             return status
 
+    @logging_service
     def is_valid_amount(self, amount):
         try:
             amount = float(amount.strip())
@@ -190,6 +217,7 @@ class HostBot:
         except :
             valid = False
 
+    @logging_service
     def check_photo(self, message):
         if message.content_type != "photo":
             force_reply = types.ForceReply()
@@ -200,6 +228,7 @@ class HostBot:
             return False
         return True
 
+    @logging_service
     def parse_call(self, call):
         key_value = call.split(";")
         data = {}
@@ -208,6 +237,7 @@ class HostBot:
             data[pair[0]] = pair[1]
         return data
 
+    @logging_service
     def get_transaction(self, transaction_id):
         self.cursor.execute(f"""
         SELECT transactions.user_id, transfers.balance 
@@ -219,7 +249,8 @@ class HostBot:
             "user" : result[0],
             "amount" : result[1]
         }
-    
+
+    @logging_service    
     def back_keyboard(self):
         back_button = types.ReplyKeyboardMarkup(resize_keyboard=True)
         back_button.add("الغاء")
@@ -233,6 +264,7 @@ class HostBot:
                 return func(self, message, *args, **kwargs)
         return wrapper
     
+    @logging_service
     def get_balance(self, user_id):
         self.cursor.execute(f'''
             SELECT balance from sellers WHERE user_id = '{user_id}'
@@ -241,6 +273,7 @@ class HostBot:
         balance =  self.cursor.fetchone()[0]
         return balance
 
+    @logging_service
     def change_balance(self, user_id, amount):
         balance = self.get_balance(user_id) + amount
         self.cursor.execute(f'''
@@ -281,19 +314,22 @@ class HostBot:
         self.bot.callback_query_handler(func=lambda call: call.data.startswith("bot:"))(self.bot_display)              
         self.bot.callback_query_handler(func=lambda call: call.data.startswith("id:"))(self.process_bot)              
 
+    @logging_service
     # Start => Register User + Display Hello Message + Keyboard [add bot - my bots - account - deposit - withdraw - check bot] | admin = [Bots Stats - Deposit Stats - Withdraw Stats - Orders]
     def start(self, message):
         user_id = message.from_user.id
         self.register_user(user_id)
         markup = self.get_main_keyboard(user_id)
         self.bot.send_message(message.chat.id, "مرحبا بكم في مدير البوتات للتنظيم تجارتك", reply_markup=markup)
-    
+
+    @logging_service    
     # add_bot => Display message + wait for response with token  => add_bot_2 => valid token display success else add_bot function again
     def add_bot(self, message):
         keyboard = self.back_keyboard()
         msg = self.bot.send_message(message.chat.id, "قم بارسال التوكن الخاصه بالبوت للتفعيل", reply_markup=keyboard)
         self.bot.register_next_step_handler(msg, self.complete_bot_register)
-    
+
+    @logging_service    
     @back_menu
     def complete_bot_register(self, message):
         try:
@@ -323,6 +359,7 @@ class HostBot:
             self.connection.rollback()
             print(e)
 
+    @logging_service
     # my_bots => Display inline Keyboard limit 6 bots per page => choose bot => Display Inline Keyboard [Stop/Start - Delete]    
     def my_bots(self, message):
         user_id = message.from_user.id
@@ -340,6 +377,7 @@ class HostBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     # Need to be fixed
     def pagination_handler(self, call):
         page = int(call.data.split(':')[1])
@@ -355,6 +393,7 @@ class HostBot:
             self.add_navigation_buttons(markup, bots, page)
             self.bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=markup)
 
+    @logging_service
     # account => Display Stats [Username - User_id - No_of_bots - Balance]
     def account(self, message):
         user_id = message.from_user.id
@@ -371,7 +410,8 @@ class HostBot:
         
         account_info = f"المعرف: {username} \n رقم الحساب ID: {user_id} \n عدد البوتات: {bot_count} \n الرصيد: {balance} جم"
         self.bot.send_message(message.chat.id, account_info)
-    
+
+    @logging_service    
     def deposit(self, message):
         text = """
         برجاء ارسال صوره من التحويل و قيمه المبلغ ارقام فقط في اسفل التحويل 
@@ -380,7 +420,8 @@ class HostBot:
         keyboard = self.back_keyboard()
         msg = self.bot.send_message(message.chat.id, text, reply_markup=keyboard)
         self.bot.register_next_step_handler(msg, self.handle_deposit)
-    
+
+    @logging_service    
     @back_menu
     def handle_deposit(self, message):
         try:
@@ -416,7 +457,8 @@ class HostBot:
             self.start(message)
         except Exception as e:
             print(e)
-    
+
+    @logging_service    
     def send_rejection(self, message, chat_id):
         text = f"""
         لقد تم رفض طلبكم بسبب :
@@ -431,6 +473,7 @@ class HostBot:
         msg = self.bot.send_message(message.chat.id, text, reply_markup=keyboard)
         self.bot.register_next_step_handler(msg, self.get_payment_method)
 
+    @logging_service
     @back_menu
     def get_payment_method(self, message):
         if not self.is_valid_amount(message.text):
@@ -450,6 +493,7 @@ class HostBot:
         msg = self.bot.send_message(message.chat.id, text, reply_markup=keyboard)
         self.bot.register_next_step_handler(msg, self.send_withdraw_request, amount)
 
+    @logging_service
     # Send Admin
     @back_menu
     def send_withdraw_request(self, message, amount):
@@ -486,7 +530,8 @@ Transaction_id : {transaction_id}
             self.start(message)
         except Exception as e:
             print(e)
-    
+
+    @logging_service    
     def process_transfer(self, call):
         # Parse Data to Dict
         data = self.parse_call(call.data)
@@ -528,6 +573,7 @@ Transaction_id : {transaction_id}
     def back_menu(self, message):
         self.start(message)
 
+    @logging_service
     def bot_display(self, call):
         try:
             message_id = call.message.id
@@ -551,6 +597,7 @@ Transaction_id : {transaction_id}
         except Exception as e:
             print(e)
 
+    @logging_service
     def process_bot(self, call):
         data = self.parse_call(call.data)
         bot_id = data['id']
@@ -612,6 +659,7 @@ class ClientBot:
         self.changed = True
 
     # Functions
+    @logging_service
     def get_status(self):
         self.cursor.execute(f"""
             SELECT status FROM bots 
@@ -619,6 +667,7 @@ class ClientBot:
         """)
         return self.cursor.fetchone()[0]
 
+    @logging_service
     def change_status(self):
         try:
             print(self.active)
@@ -629,6 +678,7 @@ class ClientBot:
         except Exception as e:
             self.connection.rollback()
 
+    @logging_service
     def get_balance(self, user_id):
         print(user_id)
         self.cursor.execute(f'''
@@ -638,10 +688,12 @@ class ClientBot:
         balance =  self.cursor.fetchone()[0]
         return balance
 
+    @logging_service
     def check_balance(self, user_id, amount=50):
         balance = self.get_balance(user_id)
         return balance >= amount
 
+    @logging_service
     def extend_expiration_date(self, date=None):
         if not date:
             date = datetime.now(self.time_zone)
@@ -649,17 +701,20 @@ class ClientBot:
         return expriation_date.strftime("%d/%m/%Y, %H:%M")
 
 
+    @logging_service
     def change_balance(self, user_id, amount):
         balance = self.get_balance(user_id) + amount
         self.cursor.execute(f'''
             UPDATE sellers set balance={balance} WHERE user_id='{user_id}'
         ''')
 
+    @logging_service
     def check_expired(self, end_date):
         date_str = datetime.now(self.time_zone).strftime("%d/%m/%Y, %H:%M")
         date = datetime.strptime(date_str, "%d/%m/%Y, %H:%M")
         return end_date < date
 
+    @logging_service
     def active_bot(self, user_id, url):
         self.active = "active"
         if self.get_status() == self.active:
@@ -690,22 +745,27 @@ class ClientBot:
         self.initialize_handlers()
         return "تم تفعيل البوت بنجاح!"
 
+    @logging_service
     def deactive_bot(self):
         self.active = "stopped"
         self.change_status()
 
+    @logging_service
     def set_webhook(self, url):
         self.active = "active"
         self.bot.delete_webhook()
         self.bot.set_webhook(url=f"{url}/{self.bot_token}", drop_pending_updates=True) 
-    
+
+    @logging_service    
     def delete_webhook(self):
         self.bot.remove_webhook()
 
+    @logging_service
     def get_self_id(self):
         query = f"SELECT id FROM bots WHERE bot_token='{self.bot_token}'"
         return self.get_one(query)[0]
-    
+
+    @logging_service    
     def get_admin(self):
         query = f"""
             SELECT sellers.user_id 
@@ -715,11 +775,13 @@ class ClientBot:
         return self.get_one(query)[0]
 
     # Functions
+    @logging_service
     def get_users(self):
         bot_id = self.get_self_id()
         query = f"SELECT user_id FROM users WHERE bot_id={bot_id}"
         return self.get_all(query)
 
+    @logging_service
     def send_order_request(self, photo, caption, data):
         buttons = {
             "قبول" : data + "accept",
@@ -728,16 +790,19 @@ class ClientBot:
         keyboard = self.build_inline_keyboard(buttons)
         admin = self.get_admin()
         self.bot.send_photo(admin, photo, caption, reply_markup=keyboard)
-
+    
+    @logging_service
     def is_admin(self, user_id):
         admin = self.get_admin()
         return admin == str(user_id)
 
+    @logging_service
     def join_orders(self, orders):
         return """
 -------------------------------
         """.join(orders)
 
+    @logging_service
     def parse_orders(self, orders):
         parsed_orders = {
             "pending" : [],
@@ -770,6 +835,7 @@ class ClientBot:
 
         return parsed_orders
 
+    @logging_service
     def parse_call_back_query(self, data):
         pairs = data.split(",")
         result = {}
@@ -778,21 +844,25 @@ class ClientBot:
             result[pair_list[0]] = pair_list[1]
 
         return result
-
+    
+    @logging_service
     def build_inline_keyboard(self, buttons):
         KEYBOARD = types.InlineKeyboardMarkup(row_width=2)
         for button, value in buttons.items():
             KEYBOARD.add(types.InlineKeyboardButton(button, callback_data=str(value)))
         return KEYBOARD
 
+    @logging_service
     def build_reply_keyboard(self, buttons):
         KEYBOARD = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
         KEYBOARD.add(*buttons)
         return KEYBOARD
 
+    @logging_service
     def get_chat_id(self, message):
         return message.chat.id
 
+    @logging_service
     def send_message(self, message, text, markups=None):
         chat_id = self.get_chat_id(message)
         try:
@@ -800,28 +870,35 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def get_one(self, query):
         self.cursor.execute(query)
         result = self.cursor.fetchone()
         return result
 
+    @logging_service
     def get_all(self, query):
         self.cursor.execute(query)
         results = self.cursor.fetchall()
         return results
 
+
+    @logging_service 
     def get_all_services(self):
         query = f"SELECT name FROM services"
         return self.get_all(query)
 
+    @logging_service
     def get_service_by_name(self, service_name):
         query = f"SELECT description, price, quantity, payment_method, id FROM services WHERE name = '{service_name}' and bot_token='{self.bot_token}'"
         return self.get_one(query)
 
+    @logging_service
     def get_service_by_id(self, service_id):
         query = f"SELECT name, description, price, payment_method FROM services WHERE id = '{service_id}'"
         return self.get_one(query)
 
+    @logging_service
     def get_all_orders(self, status=[], user=None):
         if status :
             status_query = f"status IN ({repr(status)})"
@@ -841,12 +918,14 @@ class ClientBot:
         """
         return self.get_all(query)
 
+    @logging_service
     def check_user(self, user_id):
         self.cursor.execute('''
         SELECT * FROM users WHERE user_id='%s' and bot_id=%s
         ''', (user_id, self.get_self_id()))
         return self.cursor.fetchone()
 
+    @logging_service
     def register_user(self, user_id):
         if not self.check_user(user_id):
             try:
@@ -857,6 +936,7 @@ class ClientBot:
             except Exception as e:
                 self.connection.rollback()
 
+    @logging_service
     def get_welcome_message(self):
         if self.changed:
             self.cursor.execute(f"""
@@ -880,11 +960,13 @@ class ClientBot:
         self.bot.callback_query_handler(func=lambda query: query.data.startswith("type:edit_service"))(self.edit_service)
         self.bot.callback_query_handler(func=lambda query: query.data.startswith("type:delete_service"))(self.delete_service)
 
+    @logging_service
     def send_admin(self, message):
         keyboard = self.build_reply_keyboard(['الغاء'])
         self.send_message(message, "ارسل رسالتك للبائع", keyboard)
         self.bot.register_next_step_handler(message, self.forward_message, True)
 
+    @logging_service
     def forward_message(self, message, step_handler=False):
         try:
             if step_handler or message.reply_to_message.forward_from:
@@ -897,6 +979,7 @@ class ClientBot:
             print(e)
 
 
+    @logging_service
     def start_message(self, message):
         try:
             welcome_message = self.get_welcome_message()
@@ -910,6 +993,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def get_services(self, message):
         try:
             services = [service[0] for service in self.get_all_services()]
@@ -922,6 +1006,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def display_service(self, message, keyboard):
         try:
             service_name = message.text
@@ -949,6 +1034,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def initialize_order(self, query):
         data = self.parse_call_back_query(query.data)
         item_id = data['id']
@@ -962,6 +1048,7 @@ class ClientBot:
         self.send_message(message, message_text, force_reply)
         self.bot.register_next_step_handler(message, self.check_image, item_id)
 
+    @logging_service
     def check_image(self, message, item_id):
         if message.content_type != "photo":
             force_reply = types.ForceReply()
@@ -974,6 +1061,7 @@ class ClientBot:
         else:
             self.place_order(message, item_id)
 
+    @logging_service
     def place_order(self, message, item_id):
         try:
             photo = message.photo[-1].file_id
@@ -1000,12 +1088,14 @@ class ClientBot:
             print(e)
             self.connection.rollback()
 
+    @logging_service
     def get_orders(self, message):
         keyboard = self.build_reply_keyboard(["قيد الانتظار", "الطلبات السابقه", "الكل"])
         message_text = "ما هي حاله الطلبات التي تريد؟"
         self.send_message(message, message_text, keyboard)
         self.bot.register_next_step_handler(message, self.get_orders_from_db)
 
+    @logging_service
     def get_orders_from_db(self, message):
         user_id = message.from_user.id
         status = message.text
@@ -1026,6 +1116,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def send_orders_messages(self, message, parsed_orders):
         user_id = message.from_user.id
         self.send_message(message, message.text)
@@ -1043,19 +1134,22 @@ class ClientBot:
         if completed_orders:
             self.send_message(message, completed_orders)
 
+    @logging_service
     def send_notifications(self, message):
         force_reply = types.ForceReply()
         message_text = "برجاء ارسال الرساله حتي تصل الي المستخدمين"
         self.send_message(message, message_text, force_reply)
         self.bot.register_next_step_handler(message, self.send_message_to_users)
 
+    @logging_service
     def send_message_to_users(self, message):
         users = [user[0] for user in self.get_users()]
         print(users)
         for user in users:
             self.bot.send_message(user, message.text)
         self.send_message(message, "تم الارسال للكل بنجاح")
-    
+
+    @logging_service    
     # Seller Section
     def process_transfer(self, call):
         # Parse Data to Dict
@@ -1087,6 +1181,7 @@ class ClientBot:
             print(e)
             self.connection.rollback()
 
+    @logging_service
     def send_rejection(self, message, chat_id):
         text = f"""
     لقد تم رفض طلبكم بسبب :
@@ -1094,6 +1189,7 @@ class ClientBot:
         """
         self.bot.send_message(chat_id, text)
 
+    @logging_service
     def add_service(self, message):
         if self.is_admin(message.from_user.id):
             force_reply = types.ForceReply()
@@ -1102,6 +1198,7 @@ class ClientBot:
         else:
             self.send_message(message, "لست مصرح لك لتكون هنا")
 
+    @logging_service
     def get_service_description(self, message, service_id=None):
         try:
             service_name = message.text
@@ -1112,6 +1209,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def get_service_payment_method(self, message, data, service_id):
         try:
             service_description = message.text
@@ -1122,6 +1220,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def get_service_quantity(self, message, data, service_id):
         try:
             service_payment_method = message.text
@@ -1131,7 +1230,8 @@ class ClientBot:
             self.bot.register_next_step_handler(message, self.get_service_price, data, service_id)
         except Exception as e:
             print(e)
-    
+
+    @logging_service    
     def get_service_price(self, message, data, service_id):
         service_quantity = message.text
         try:
@@ -1146,6 +1246,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def save_service(self, message, data, service_id):
         try:
             service_price = float(message.text)
@@ -1169,6 +1270,7 @@ class ClientBot:
             print(e)
             self.connection.rollback()
 
+    @logging_service
     def edit_service(self, query):
         try:
             service_id = self.parse_call_back_query(query.data)['id']
@@ -1179,6 +1281,7 @@ class ClientBot:
         except Exception as e:
             print(e)
 
+    @logging_service
     def process_edit_choice(self, message, service_id):
         edit_choice = message.text
         data = {
@@ -1189,6 +1292,7 @@ class ClientBot:
         else:
             self.ask_for_new_value(message, service_id, data)
 
+    @logging_service
     def ask_for_new_value(self, message, service_id, data):
         edit_choice = data['edit_choice']
         prompt = f" ادخل القيمه الجديده ل {edit_choice}"
@@ -1196,6 +1300,7 @@ class ClientBot:
         self.send_message(message, prompt, force_reply)
         self.bot.register_next_step_handler(message, self.update_service, service_id, edit_choice)
 
+    @logging_service
     def update_service(self, message, service_id, edit_choice):
         try:
             new_value = message.text
@@ -1216,6 +1321,7 @@ class ClientBot:
             self.connection.rollback()
 
 
+    @logging_service
     def delete_service(self, query):
         try:
             service_id = self.parse_call_back_query(query.data)['id']
@@ -1232,7 +1338,8 @@ class ClientBot:
             print(e)
 
         self.send_message(query.message, msg)
-        
+
+    @logging_service        
     def display_settings(self, message):
         if not self.is_admin(message.from_user.id):
             return
@@ -1241,6 +1348,7 @@ class ClientBot:
         self.send_message(message, message.text, keyboard)
         self.bot.register_next_step_handler(message, self.handle_settings)
 
+    @logging_service
     def handle_settings(self, message):
         text = message.text
         if text in ["/start", "العوده"]:
@@ -1250,7 +1358,8 @@ class ClientBot:
             self.send_message(message, "ارسل الرساله الترحيبيه الجديده")
             self.bot.register_next_step_handler(message, self.save_welcome_message)
             return
-    
+
+    @logging_service    
     def save_welcome_message(self, message):
         text = "تم تسجيل الرساله بنجاح!"
         try:
