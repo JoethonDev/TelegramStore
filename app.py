@@ -1,14 +1,16 @@
 import telebot
 from flask import Flask, request
 from bots import *
+from constants import API_TOKEN, WEBHOOK_URL
 
-
-API_TOKEN = '1156662740:AAEWzSmMZkdRiwlBX_fmLxdMeUuPQgE3ETM' # Store in env
-WEBHOOK_URL = 'https://xenogeneic-jannelle-joethon-b834bbe8.koyeb.app' # Store in env
 WEBHOOK_PORT = 8000
 
 bot = HostBot(API_TOKEN)
 app = Flask(__name__)
+
+@app.route('/', methods=['GET'])
+def health():
+    return {"message" : "Server is working!"}, 200
 
 @app.route('/', methods=['POST'])  # Default route for all bots
 def echo_all():

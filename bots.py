@@ -3,6 +3,7 @@ from telebot import types
 import psycopg2
 import pytz
 from datetime import datetime, timedelta
+from constants import WEBHOOK_URL
 
 
 # Start => Register User + Display Hello Message + Keyboard [add bot - my bots - account - deposit - withdraw - check bot] | admin = [Bots Stats - Deposit Stats - Withdraw Stats - Orders]
@@ -257,7 +258,7 @@ class HostBot:
             host="ep-delicate-tooth-a2u3cnv5.eu-central-1.aws.neon.tech",
             port="5432"
         )
-        self.url = "https://xenogeneic-jannelle-joethon-b834bbe8.koyeb.app"
+        self.url = WEBHOOK_URL
         self.cursor = self.connection.cursor()
         self.time_zone = pytz.timezone('Africa/Cairo')
         self.admin = "1019315752"
