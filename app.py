@@ -45,5 +45,5 @@ def webhook(token):
 bot.set_webhook(WEBHOOK_URL)
 
 # Start Flask server to listen for webhook requests
-# if __name__ == '__main__':
-#     app.run(host='0.0.0.0', port=WEBHOOK_PORT, debug=True)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=WEBHOOK_PORT, debug=True)
