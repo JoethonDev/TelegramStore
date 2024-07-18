@@ -8,11 +8,11 @@ WEBHOOK_PORT = 8000
 bot = HostBot(API_TOKEN)
 app = Flask(__name__)
 
-@app.route('/', methods=['GET'])
+@app.route('/bot', methods=['GET'])
 def health():
     return {"message" : "Server is working!"}, 200
 
-@app.route('/', methods=['POST'])  # Default route for all bots
+@app.route('/bot', methods=['POST'])  # Default route for all bots
 def echo_all():
     if request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
@@ -22,7 +22,7 @@ def echo_all():
     else:
         return 'Unsupported Media Type', 415
 
-@app.route('/<token>', methods=['GET','POST'])
+@app.route('/bot/<token>', methods=['GET','POST'])
 def webhook(token):
     if request.headers.get('content-type') == 'application/json':
             json_string = request.get_data().decode('utf-8')
