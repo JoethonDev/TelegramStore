@@ -1,8 +1,14 @@
 import psycopg2
 import logging
+import pytz
+import datetime
+
 
 def is_expired(date):
-    return False
+    time_zone = pytz.timezone('Africa/Cairo')
+    date = date.split(",")[0]
+    now_date = datetime.datetime.now(time_zone)
+    return now_date.strftime("%d/%m/%Y") == date
 
 try:
     connection = psycopg2.connect(
