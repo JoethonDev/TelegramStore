@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS services (
 )
 ''')
 
+# Create the 'services' table
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS plans (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL,
+    duration INTEGER NOT NULL,
+    bot_id INTEGER,
+    FOREIGN KEY (bot_id) REFERENCES bots(id) ON DELETE CASCADE
+)
+''')
+
 # Create the 'orders' table
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS orders (

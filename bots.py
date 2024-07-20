@@ -101,6 +101,7 @@ class HostBot:
     
     def is_admin(self, user_id):
         # Check if the user is an admin
+        # TODO
         return str(user_id) == self.admin # Remove hardcoded
         # self.cursor.execute('SELECT * FROM admins WHERE user_id = %s', (user_id,))
         # return self.cursor.fetchone() is not None
@@ -270,6 +271,7 @@ class HostBot:
         self.bot.message_handler(func= lambda message : message.text == 'الحساب')(self.account)
         self.bot.message_handler(func= lambda message : message.text == 'ايداع')(self.deposit)
         self.bot.message_handler(func= lambda message : message.text == 'سحب')(self.withdraw)
+        # TODO
         # self.bot.message_handler(func= lambda message : message.text == 'اضافه بوتات')(self.add_bot)
         # self.bot.message_handler(func= lambda message : message.text == 'البوتات الخاصه بي')(self.my_bots)
         # self.bot.message_handler(func= lambda message : message.text == 'الحساب')(self.account)
@@ -279,8 +281,9 @@ class HostBot:
         # Inline keyboard handler
         self.bot.callback_query_handler(func=lambda call: call.data.startswith("type:transfer"))(self.process_transfer)
         self.bot.callback_query_handler(func=lambda call: call.data.startswith("page:"))(self.pagination_handler)
-        self.bot.callback_query_handler(func=lambda call: call.data.startswith("bot:"))(self.bot_display)              
-        self.bot.callback_query_handler(func=lambda call: call.data.startswith("id:"))(self.process_bot)              
+        self.bot.callback_query_handler(func=lambda call: call.data.startswith("bot:"))(self.bot_display)           
+        self.bot.callback_query_handler(func=lambda call: call.data.startswith("id:"))(self.process_bot)         
+        self.bot.callback_query_handler(func=lambda call: call.data.startswith("type:plan"))(self.process_plan)          
 
     # Start => Register User + Display Hello Message + Keyboard [add bot - my bots - account - deposit - withdraw - check bot] | admin = [Bots Stats - Deposit Stats - Withdraw Stats - Orders]
     def start(self, message):
@@ -552,6 +555,15 @@ Transaction_id : {transaction_id}
         except Exception as e:
             print(e)
 
+    def create_client_bot(self, bot_id):
+        query = f"""
+        SELECT bot_token from bots 
+        WHERE id = {bot_id}
+        """
+        self.cursor.execute(query)
+        token = self.cursor.fetchone()[0]
+        return ClientBot(token)
+
     def process_bot(self, call):
         data = self.parse_call(call.data)
         bot_id = data['id']
@@ -560,13 +572,7 @@ Transaction_id : {transaction_id}
         chat_id = call.message.chat.id
         self.bot.delete_message(chat_id=chat_id, message_id=message_id)
 
-        query = f"""
-        SELECT bot_token from bots 
-        WHERE id = {bot_id}
-        """
-        self.cursor.execute(query)
-        token = self.cursor.fetchone()[0]
-        client_bot = ClientBot(token)
+        client_bot = self.create_client_bot(bot_id)
         try:
             if action == "delete":
                 text = "تم حذف البوت بنجاح!"
@@ -583,14 +589,80 @@ Transaction_id : {transaction_id}
                     self.connection.rollback()
             
             elif action == "start" :
-                text = client_bot.active_bot(chat_id, self.url)
+                if client_bot.get_expiration_status():
+                    self.display_plans(chat_id, bot_id)
+                    return
+                text = client_bot.active_bot(self.url)
             elif action == "stop" :
                 text = "تم ايقاف البوت بنجاح"
                 client_bot.deactive_bot()
             self.bot.send_message(chat_id, text)
         except Exception as e:
             print(e)
-            
+
+    def get_plans(self):
+        self.cursor.execute(f"SELECT plan_name FROM plans WHERE bot_id={self.get_self_id()}")
+        return [plan[0] for plan in self.cursor.fetchall()]
+    
+    def get_plan_details(self, name):
+        self.cursor.execute(f"SELECT * FROM plans WHERE plan_name='{name}' and bot_id={self.get_self_id()}")
+        plan = self.cursor.fetchone()
+        return {
+            "plan_id" : plan[0],
+            "plan_name" : plan[1],
+            "price" : plan[2],
+            "duration" : plan[3]
+        }
+
+    @back_menu
+    def display_plans(self, chat_id, bot_id):
+        plans = self.get_plans()
+        keyboard = types.ReplyKeyboardMarkup()
+        keyboard.add(*plans)    
+        keyboard.add("الغاء")
+        msg = self.bot.send_message(chat_id, "اختر الباقه المناسبه لك", reply_markup=keyboard)   
+        self.bot.register_next_step_handler(msg, self.select_plan(), bot_id)
+
+    @back_menu
+    def select_plan(self, message, bot_id):
+        keyboard = types.InlineKeyboardMarkup()
+        chat_id = message.chat.id
+        try:
+            plan = self.get_plan_details(message.text)
+            data = f"type:plan;id:{plan['plan_id']};price:{plan['price']};duration:{plan['duration']};bot:{bot_id}"
+            confirm = types.InlineKeyboardButton("تاكيد", callback_data=data)
+            keyboard.add(confirm)
+            text = f"""
+الباقه : {plan['plan_name']}
+السعر : {plan['price']}
+المده : {plan['duration']}
+
+للتاكيد العمليه برجاء الضغط علي زر التاكيد
+"""
+            self.bot.send_message(chat_id, text, reply_markup=keyboard)
+        except Exception as e:
+            print(e)
+            self.display_plans(chat_id, bot_id)
+
+    def process_plan(self, call):
+        data = self.parse_call(call)
+        chat_id = call.message.chat.id
+        message_id = call.message.id
+        amount = data['price']
+        duration = data['duration']
+        bot_id = data['bot']
+        try :
+            client_bot = self.create_client_bot(bot_id)
+            if not client_bot.check_balance(chat_id, amount):
+                text = f"ليس لديك رصيد كافي لاضافه البوت برجاء الشحن ب {amount} جم اولا"
+            else:
+                client_bot.charge_bot(chat_id, duration, amount)
+                text = client_bot.active_bot(self.url)
+        except Exception as e:
+            print(e)
+
+        self.bot.delete_message(chat_id, message_id)
+        self.bot.send_message(chat_id, text)
 
 # Refactor code to use SQL 
 # Refactor Sql schema to make use same table for more bots
@@ -643,10 +715,12 @@ class ClientBot:
         balance = self.get_balance(user_id)
         return balance >= amount
 
-    def extend_expiration_date(self, date=None):
+    def extend_expiration_date(self, date=None, duration=None):
+        if not duration:
+            raise Exception("Missing Duration!")
         if not date:
             date = datetime.now(self.time_zone)
-        expriation_date = date + timedelta(days=30)
+        expriation_date = date + timedelta(days=duration)
         return expriation_date.strftime("%d/%m/%Y, %H:%M")
 
 
@@ -661,32 +735,40 @@ class ClientBot:
         date = datetime.strptime(date_str, "%d/%m/%Y, %H:%M")
         return end_date < date
 
-    def active_bot(self, user_id, url):
-        self.active = "active"
-        if self.get_status() == self.active:
-            return "البوت مفعل سابقا!"
-        
-        self.set_webhook(url)
-        # Put expiration date
+    def get_expiration_date(self):
         self.cursor.execute(f"""
         SELECT expiration_date from bots
         WHERE bot_token='{self.bot_token}'
         """)
         end_date = self.cursor.fetchone()[0] or None
+        return end_date
+
+    def get_expiration_status(self):
+        end_date = self.get_expiration_date()
         if end_date:
             end_date = datetime.strptime(end_date, "%d/%m/%Y, %H:%M")
             if self.check_expired(end_date):
-                if not self.check_balance(user_id):
-                    return "ليس لديك رصيد كافي لاضافه البوت برجاء الشحن ب 50 جم اولا"
-                expiration_date = self.extend_expiration_date(end_date)
-                self.cursor.execute(f"""
-                UPDATE bots SET expiration_date='{expiration_date}'
-                WHERE bot_token='{self.bot_token}'
-                """)
-                
-                # Charge User
-                self.change_balance(user_id, -50)
-                self.connection.commit()
+                return True
+        return False
+
+    def charge_bot(self, user_id, duration, amount):
+        end_date = self.get_expiration_date()
+        expiration_date = self.extend_expiration_date(end_date, duration)
+        self.cursor.execute(f"""
+        UPDATE bots SET expiration_date='{expiration_date}'
+        WHERE bot_token='{self.bot_token}'
+        """)
+            
+        # Charge User
+        self.change_balance(user_id, -amount)
+        self.connection.commit()
+
+    def active_bot(self, url):
+        self.active = "active"
+        if self.get_status() == self.active:
+            return "البوت مفعل سابقا!"
+        
+        self.set_webhook(url)
         self.change_status()
         self.initialize_handlers()
         return "تم تفعيل البوت بنجاح!"
