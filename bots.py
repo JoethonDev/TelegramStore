@@ -330,10 +330,14 @@ class HostBot:
     # my_bots => Display inline Keyboard limit 6 bots per page => choose bot => Display Inline Keyboard [Stop/Start - Delete]    
     def my_bots(self, message):
         user_id = message.chat.id
-        seller_id = self.get_seller(user_id)
         self.cursor.execute('''
-            SELECT * FROM bots WHERE seller_id = %s
-        ''', (seller_id,))
+            SELECT * FROM bots WHERE 
+        ''')
+        if not self.is_admin(user_id):
+            seller_id = self.get_seller(user_id)
+            self.cursor.execute('''
+                SELECT * FROM bots WHERE seller_id = %s
+            ''', (seller_id,))
         bots = self.cursor.fetchall()
         
         try:
