@@ -329,12 +329,13 @@ class HostBot:
 
     # my_bots => Display inline Keyboard limit 6 bots per page => choose bot => Display Inline Keyboard [Stop/Start - Delete]    
     def my_bots(self, message):
-        user_id = message.from_user.id
+        user_id = message.chat.id
         seller_id = self.get_seller(user_id)
         self.cursor.execute('''
             SELECT * FROM bots WHERE seller_id = %s
         ''', (seller_id,))
         bots = self.cursor.fetchall()
+        
         try:
             if bots:
                 markup = self.get_bots_keyboard(bots, 1)
@@ -342,7 +343,7 @@ class HostBot:
             else:
                 self.bot.send_message(message.chat.id, "لا يوجد بوتات")
         except Exception as e:
-            print(e)
+            print(f"Message form here : {e}")
 
     # Need to be fixed
     def pagination_handler(self, call):
@@ -528,9 +529,6 @@ Transaction_id : {transaction_id}
         except Exception as e:
                 print(e)
                 self.connection.rollback()
-
-    # def back_menu(self, message):
-    #     self.start(message)
 
     def bot_display(self, call):
         try:
