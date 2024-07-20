@@ -529,8 +529,8 @@ Transaction_id : {transaction_id}
                 print(e)
                 self.connection.rollback()
 
-    def back_menu(self, message):
-        self.start(message)
+    # def back_menu(self, message):
+    #     self.start(message)
 
     def bot_display(self, call):
         try:
@@ -601,11 +601,11 @@ Transaction_id : {transaction_id}
             print(e)
 
     def get_plans(self):
-        self.cursor.execute(f"SELECT plan_name FROM plans WHERE bot_id={self.get_self_id()}")
+        self.cursor.execute(f"SELECT name FROM plans WHERE bot_id={self.get_self_id()}")
         return [plan[0] for plan in self.cursor.fetchall()]
     
     def get_plan_details(self, name):
-        self.cursor.execute(f"SELECT * FROM plans WHERE plan_name='{name}' and bot_id={self.get_self_id()}")
+        self.cursor.execute(f"SELECT * FROM plans WHERE name='{name}' and bot_id={self.get_self_id()}")
         plan = self.cursor.fetchone()
         return {
             "plan_id" : plan[0],
@@ -614,14 +614,16 @@ Transaction_id : {transaction_id}
             "duration" : plan[3]
         }
 
-    @back_menu
     def display_plans(self, chat_id, bot_id):
-        plans = self.get_plans()
-        keyboard = types.ReplyKeyboardMarkup()
-        keyboard.add(*plans)    
-        keyboard.add("الغاء")
-        msg = self.bot.send_message(chat_id, "اختر الباقه المناسبه لك", reply_markup=keyboard)   
-        self.bot.register_next_step_handler(msg, self.select_plan(), bot_id)
+        try:
+            plans = self.get_plans()
+            keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            keyboard.add(*plans)    
+            keyboard.add("الغاء")
+            msg = self.bot.send_message(chat_id, "اختر الباقه المناسبه لك", reply_markup=keyboard)   
+            self.bot.register_next_step_handler(msg, self.select_plan, bot_id)
+        except Exception as e:
+            print(e)
 
     @back_menu
     def select_plan(self, message, bot_id):
@@ -645,12 +647,13 @@ Transaction_id : {transaction_id}
             self.display_plans(chat_id, bot_id)
 
     def process_plan(self, call):
-        data = self.parse_call(call)
+        data = self.parse_call(call.data)
         chat_id = call.message.chat.id
         message_id = call.message.id
-        amount = data['price']
-        duration = data['duration']
+        amount = float(data['price'])
+        duration = int(data['duration'])
         bot_id = data['bot']
+
         try :
             client_bot = self.create_client_bot(bot_id)
             if not client_bot.check_balance(chat_id, amount):
@@ -662,7 +665,8 @@ Transaction_id : {transaction_id}
             print(e)
 
         self.bot.delete_message(chat_id, message_id)
-        self.bot.send_message(chat_id, text)
+        msg = self.bot.send_message(chat_id, text)
+        self.start(msg)
 
 # Refactor code to use SQL 
 # Refactor Sql schema to make use same table for more bots
@@ -744,12 +748,15 @@ class ClientBot:
         return end_date
 
     def get_expiration_status(self):
-        end_date = self.get_expiration_date()
-        if end_date:
-            end_date = datetime.strptime(end_date, "%d/%m/%Y, %H:%M")
-            if self.check_expired(end_date):
-                return True
-        return False
+        try:
+            end_date = self.get_expiration_date()
+            if end_date:
+                end_date = datetime.strptime(end_date, "%d/%m/%Y, %H:%M")
+                if not self.check_expired(end_date):
+                    return False
+            return True
+        except Exception as e:
+            print(f"expiration Error {e}")
 
     def charge_bot(self, user_id, duration, amount):
         end_date = self.get_expiration_date()
