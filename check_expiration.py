@@ -6,9 +6,8 @@ import datetime
 
 def is_expired(date):
     time_zone = pytz.timezone('Africa/Cairo')
-    date = date.split(",")[0]
     now_date = datetime.datetime.now(time_zone)
-    return now_date.strftime("%d/%m/%Y") == date
+    return now_date.strftime("%d/%m/%Y, %H:%M") >= date
 
 try:
     connection = psycopg2.connect(
